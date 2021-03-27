@@ -1,0 +1,66 @@
+server-hosts:
+  predictor:
+    ip: &predictor-ip
+      127.0.0.1
+    port: &predictor-port
+      6100
+  trainer:
+    ip: &trainer-ip
+      127.0.0.1
+    pub-port: &trainer-pub-port
+      9800
+    pull-port: &trainer-pull-port
+      5000
+  logger:
+    ip: &logger-ip
+      127.0.0.1
+    port: &logger-port
+      9600
+client:
+  sockets:
+    req_predictor:
+      ip: *predictor-ip
+      port: *predictor-port
+      mode: req
+    push_trainer:
+      ip: *trainer-ip
+      port: *trainer-pull-port
+      mode: push
+    push_logger:
+      ip: *logger-ip
+      port: *logger-port
+      mode: push
+predictor:
+  sockets:
+    router_client:
+      ip: *predictor-ip
+      port: *predictor-port
+      mode: router
+    sub_trainer:
+      ip: *trainer-ip
+      port: *trainer-pub-port
+      mode: sub
+    push_logger:
+      ip: *logger-ip
+      port: *logger-port
+      mode: push
+trainer:
+  sockets:
+    pull_client:
+      ip: *trainer-ip
+      port: *trainer-pull-port
+      mode: pull
+    pub_predictor:
+      ip: *trainer-ip
+      port: *trainer-pub-port
+      mode: pub
+    push_logger:
+      ip: *logger-ip
+      port: *logger-port
+      mode: push
+logger:
+  sockets:
+    pull_all:
+      ip: *logger-ip
+      port: *logger-port
+      mode: pull
