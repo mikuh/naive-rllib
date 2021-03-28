@@ -1,0 +1,14 @@
+ppo:
+  env: CartPole-v1
+  lr: 0.001
+  gamma: 0.99
+  lamda: 0.95
+  optimizers: adam
+  rollout: 128
+  batch_size: 128
+  epoch: 4
+  ppo_eps: 0.2
+  normalize: True
+  state_size: 4
+  action_size: 2
+  eager: True
