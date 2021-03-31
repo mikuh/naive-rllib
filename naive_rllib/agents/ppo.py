@@ -1,15 +1,47 @@
+"""
+The agent with out brain, do 3 things:
+- send the obs to predictor and get the agent
+- send the obs to trainer for train model
+- send logs to logger
+"""
+
 from naive_rllib.models import PPO
-from naive_rllib.utils import ZmqAdaptor, get_logger
+from naive_rllib.utils import ZmqAdaptor, get_logger, Monitor
+from naive_rllib.configs import get_agent_config, get_zmq_config
 import tensorflow as tf
 import numpy as np
 import copy
 import gym
-from naive_rllib.configs import get_agent_config, get_zmq_config
+
 import pickle
 import time
 
 
+
 class Agent(object):
+
+    def __init__(self, config):
+
+        self.client = ZmqAdaptor(config=config["client"]["sockets"], logger=get_logger())
+        print(self.client.sockets)
+
+    @Monitor.dealy()
+    def get_action(self, obs):
+        self.client.req_predictor.send(pickle.dumps(obs))
+        result = self.client.req_predictor.recv()
+        result = pickle.loads(result)
+        return result['action']
+
+    def send_instance(self):
+        """
+        1. push to trainer
+        2. push to logger
+        """
+
+        pass
+
+
+class AgentWithBrain(object):
 
     def __init__(self,
                  model=PPO,
@@ -179,5 +211,5 @@ class Agent(object):
 
 if __name__ == '__main__':
     ppo_config = get_agent_config()["ppo"]
-    agent = Agent(**ppo_config)
-    agent.learn()
+    agent = Agent(get_zmq_config())
+    # agent.learn()
