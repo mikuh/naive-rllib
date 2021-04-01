@@ -17,28 +17,47 @@ import pickle
 import time
 
 
-
 class Agent(object):
 
     def __init__(self, config):
 
         self.client = ZmqAdaptor(config=config["client"]["sockets"], logger=get_logger())
-        print(self.client.sockets)
+        # print(self.client.sockets)
+
+        self.gamma = 0.99
+        self.lamda = 0.00
+        self.gae_normalize = False
 
     @Monitor.dealy()
     def get_action(self, obs):
         self.client.req_predictor.send(pickle.dumps(obs))
         result = self.client.req_predictor.recv()
         result = pickle.loads(result)
-        return result['action']
+        return result["action"], result["policy"], result["value"]
 
-    def send_instance(self):
-        """
-        1. push to trainer
-        2. push to logger
-        """
+    def push_trainer(self, instance):
+        gaes, targets = self.get_gae(instance.rewards[:-1], instance.dones[:-1], instance.values[:-1], instance.values[1:])
+        data = pickle.dumps(instance.dict.update({"gaes": gaes, "targets": targets}))
+        self.client.push_trainer.send(data)
 
+    def push_logger(self, d):
+        print("日志信息：", d["score"], d["steps"])
         pass
+
+    def get_gae(self, rewards, dones, values, next_values):
+        deltas = [r + self.gamma * (1 - d) * nv - v for r, d, nv, v in zip(rewards, dones, next_values, values)]
+        deltas = np.stack(deltas)
+        gaes = copy.deepcopy(deltas)
+        for t in reversed(range(len(deltas) - 1)):
+            gaes[t] = gaes[t] + (1 - dones[t]) * self.gamma * self.lamda * gaes[t + 1]
+        target = gaes + values
+        if self.gae_normalize:
+            gaes = (gaes - gaes.mean()) / (gaes.std() + 1e-8)
+        return gaes, target
+
+    def get_predict_result(self, obs):
+
+        return np.random.randint(0, 1), [0.5, 0.5], 1
 
 
 class AgentWithBrain(object):
@@ -92,30 +111,34 @@ class AgentWithBrain(object):
 
     def get_action(self, state):
         state = tf.convert_to_tensor([state], dtype=tf.float32)
-        policy, _ = self.ppo(state)
-        policy = np.array(policy)[0]
+        _policy, value = self.ppo(state)
+        policy = np.array(_policy)[0]
         action = np.random.choice(self.action_size, p=policy)
-        return action
+        return action, value[0], _policy
 
     def pub_model(self):
         weights = self.ppo.get_weights()
         start = time.time()
         b_weights = pickle.dumps(weights)
         self.trainer.pub_predictor.send(b_weights)
-        print("cost:", time.time()-start)
+        print("cost:", time.time() - start)
 
-    def update(self, state, next_state, reward, done, action):
-        old_policy, current_value = self.ppo(tf.convert_to_tensor(state, dtype=tf.float32))
-        _, next_value = self.ppo(tf.convert_to_tensor(next_state, dtype=tf.float32))
-        current_value, next_value = tf.squeeze(current_value), tf.squeeze(next_value)
-        current_value, next_value = np.array(current_value), np.array(next_value)
-        old_policy = np.array(old_policy)
+    def update(self, state, next_state, reward, done, action, value, policy):
+        # old_policy, current_value = self.ppo(tf.convert_to_tensor(state, dtype=tf.float32))
+        # _, next_value = self.ppo(tf.convert_to_tensor(next_state, dtype=tf.float32))
+        # print(value[1:])
+        # print(list(next_value))
+
+        # current_value, next_value = tf.squeeze(current_value), tf.squeeze(next_value)
+        # current_value, next_value = np.array(current_value), np.array(next_value)
+        # old_policy = np.array(old_policy)
+        policy = np.array(tf.squeeze(policy))
 
         adv, target = self.get_gaes(
-            rewards=np.array(reward),
-            dones=np.array(done),
-            values=current_value,
-            next_values=next_value,
+            rewards=np.array(reward[:-1]),
+            dones=np.array(done[:-1]),
+            values=np.array(tf.squeeze(value)[:-1]),
+            next_values=np.array(tf.squeeze(value)[1:]),
             gamma=self.gamma,
             lamda=self.lamda,
             normalize=self.normalize)
@@ -130,7 +153,7 @@ class AgentWithBrain(object):
             batch_action = [action[i] for i in sample_idx]
             batch_target = [target[i] for i in sample_idx]
             batch_adv = [adv[i] for i in sample_idx]
-            batch_old_policy = [old_policy[i] for i in sample_idx]
+            batch_old_policy = [policy[i] for i in sample_idx]
 
             ppo_variable = self.ppo.trainable_variables
 
@@ -169,14 +192,16 @@ class AgentWithBrain(object):
         episode = 0
         score = 0
 
+        state_list, next_state_list = [], []
+        reward_list, done_list, action_list = [], [], []
+        value_list, policy_list = [], []
+        start_time = time.time()
+
         while True:
 
-            state_list, next_state_list = [], []
-            reward_list, done_list, action_list = [], [], []
+            while len(state_list) <= self.rollout:
 
-            for _ in range(self.rollout):
-
-                action = self.get_action(state)
+                action, value, policy = self.get_action(state)
                 next_state, reward, done, _ = self.env.step(action)
 
                 score += reward
@@ -194,22 +219,33 @@ class AgentWithBrain(object):
                 reward_list.append(reward)
                 done_list.append(done)
                 action_list.append(action)
+                value_list.append(value)
+                policy_list.append(policy)
 
                 state = next_state
 
                 if done:
-                    # print(episode, score)
+                    print(episode, score, time.time() - start_time)
                     state = self.env.reset()
                     episode += 1
                     score = 0
+
             self.update(
                 state=state_list, next_state=next_state_list,
-                reward=reward_list, done=done_list, action=action_list)
+                reward=reward_list, done=done_list, action=action_list, value=value_list, policy=policy_list)
 
-            self.pub_model()
+            state_list, next_state_list = [state_list[-1]], [next_state]
+            reward_list, done_list, action_list = [reward], [done], [action]
+            value_list, policy_list = [value], [policy]
+
+            # self.pub_model()
 
 
 if __name__ == '__main__':
+    # ppo_config = get_agent_config()["ppo"]
+    # agent = AgentWithBrain(**ppo_config)  # get_zmq_config()
+    # agent.learn()
+
     ppo_config = get_agent_config()["ppo"]
     agent = Agent(get_zmq_config())
     # agent.learn()

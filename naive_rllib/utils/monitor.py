@@ -5,19 +5,18 @@ import time
 class Monitor(object):
 
     def __init__(self):
-        self.data = {}
+        self.data = {"msg_type": "moni"}
 
     def record(self, **kwargs):
         for key, value in kwargs.items():
             if key not in self.data:
                 self.data[key] = []
             self.data[key].append(value)
+        return self
 
-    def reset(self, msg_type=None):
+    def reset(self):
         result = self.data.copy()
-        if msg_type is not None:
-            result['msg_type'] = msg_type
-        self.data = {}
+        self.data = {"msg_type": "moni"}
         return result
 
     @classmethod
@@ -34,10 +33,10 @@ class Monitor(object):
                 else:
                     moni.record(action_dealy=time.time() - start_time)
                 return a
-
             return wrapper
-
         return decorate
+
+
 
 
 if __name__ == '__main__':
