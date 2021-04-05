@@ -20,12 +20,11 @@ import time
 class Agent(object):
 
     def __init__(self, config):
-
         self.client = ZmqAdaptor(config=config["client"]["sockets"], logger=get_logger())
         # print(self.client.sockets)
 
         self.gamma = 0.99
-        self.lamda = 0.00
+        self.lamda = 0.95
         self.gae_normalize = False
 
     @Monitor.dealy()
@@ -38,6 +37,7 @@ class Agent(object):
     def push_trainer(self, instance):
         gaes, targets = self.get_gae(instance.rewards[:-1], instance.dones[:-1], instance.values[:-1], instance.values[1:])
         data = pickle.dumps(instance.dict.update({"gaes": gaes, "targets": targets}))
+
         self.client.push_trainer.send(data)
 
     def push_logger(self, d):
@@ -149,7 +149,7 @@ class AgentWithBrain(object):
             sample_idx = sample_range[:self.batch_size]
 
             batch_state = [state[i] for i in sample_idx]
-            batch_done = [done[i] for i in sample_idx]
+            # batch_done = [done[i] for i in sample_idx]
             batch_action = [action[i] for i in sample_idx]
             batch_target = [target[i] for i in sample_idx]
             batch_adv = [adv[i] for i in sample_idx]
@@ -174,6 +174,9 @@ class AgentWithBrain(object):
                 logoldpi = tf.math.log(selected_old_prob + 1e-8)
 
                 ratio = tf.exp(logpi - logoldpi)
+                # if x == 1:
+                #     print(selected_prob == selected_old_prob)
+                #     print(ratio[0])
                 clipped_ratio = tf.clip_by_value(ratio, clip_value_min=1 - self.ppo_eps,
                                                  clip_value_max=1 + self.ppo_eps)
                 minimum = tf.minimum(tf.multiply(train_adv, clipped_ratio), tf.multiply(train_adv, ratio))
@@ -242,10 +245,10 @@ class AgentWithBrain(object):
 
 
 if __name__ == '__main__':
-    # ppo_config = get_agent_config()["ppo"]
-    # agent = AgentWithBrain(**ppo_config)  # get_zmq_config()
-    # agent.learn()
-
     ppo_config = get_agent_config()["ppo"]
-    agent = Agent(get_zmq_config())
+    agent = AgentWithBrain(**ppo_config)  # get_zmq_config()
+    agent.learn()
+
+    # ppo_config = get_agent_config()["ppo"]
+    # agent = Agent(get_zmq_config())
     # agent.learn()
