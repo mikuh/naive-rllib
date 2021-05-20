@@ -1,6 +1,6 @@
 import zmq
 
-
+# TODO set the time out
 class ZmqAdaptor(object):
     modes = {"req": zmq.REQ, 'rep': zmq.REP, 'pub': zmq.PUB, 'sub': zmq.SUB, 'push': zmq.PUSH, 'pull': zmq.PULL,
              'router': zmq.ROUTER, 'dealer': zmq.DEALER}

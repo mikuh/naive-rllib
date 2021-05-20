@@ -56,7 +56,7 @@ class AtariClient(object):
     def __init__(self, env_name, agent, logger, configs=None):
         self.logger = logger
         self.env = self.get_env(env_name)
-        self.agent = agent # (configs["agent"])
+        self.agent = agent  # (configs["agent"])
         self.rollout = 200
         self.instance = Instance(self.rollout)
         # TODO bind the monitor to the clinet

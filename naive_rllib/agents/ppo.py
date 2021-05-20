@@ -36,8 +36,8 @@ class Agent(object):
 
     def push_trainer(self, instance):
         gaes, targets = self.get_gae(instance.rewards[:-1], instance.dones[:-1], instance.values[:-1], instance.values[1:])
-        data = pickle.dumps(instance.dict.update({"gaes": gaes, "targets": targets}))
-
+        instance.dict.update({"gaes": gaes, "targets": targets})
+        data = pickle.dumps(instance.dict)
         self.client.push_trainer.send(data)
 
     def push_logger(self, d):
