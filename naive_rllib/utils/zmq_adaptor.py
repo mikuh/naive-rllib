@@ -11,6 +11,7 @@ class ZmqAdaptor(object):
         self.logger = logger
         self.context = zmq.Context()
         self.poller = zmq.Poller()
+        self.noblock = zmq.NOBLOCK
         self._sockets = {}
         for k, v in config.items():
             self._sockets[k] = self.create_socket(v['mode'], v['ip'], v['port'])

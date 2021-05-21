@@ -23,16 +23,16 @@ class Trainer(object):
         data = self.trainer.pull_client.recv()
         data = pickle.loads(data)
         for _ in range(self.epoch):
-            sample_range = np.arange(len(data.dones))
+            sample_range = np.arange(len(data['dones'])-1)
             np.random.shuffle(sample_range)
             sample_idx = sample_range[:self.batch_size]
 
-            batch_state = [data.state[i] for i in sample_idx]
+            batch_state = [data['states'][i] for i in sample_idx]
             # batch_done = [done[i] for i in sample_idx]
-            batch_action = [data.action[i] for i in sample_idx]
-            batch_target = [data.target[i] for i in sample_idx]
-            batch_adv = [data.adv[i] for i in sample_idx]
-            batch_old_policy = [data.policy[i] for i in sample_idx]
+            batch_action = [data['actions'][i] for i in sample_idx]
+            batch_target = [data['targets'][i] for i in sample_idx]
+            batch_adv = [data['gaes'][i] for i in sample_idx]
+            batch_old_policy = [data['policys'][i] for i in sample_idx]
 
             ppo_variable = self.ppo.trainable_variables
 
@@ -75,10 +75,9 @@ class Trainer(object):
         n = 0
         while True:
             n += 1
+            self.update()
             self.pub_model()
             print("pub model success")
-            self.update()
-            # break
 
 
 if __name__ == '__main__':

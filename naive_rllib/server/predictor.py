@@ -4,7 +4,7 @@ from naive_rllib.models.ppo import PPO
 import pickle
 import numpy as np
 import os
-
+import zmq
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 
@@ -23,6 +23,7 @@ class Predictor(object):
     def predict(self):
         """get the model result
         """
+        print(1111)
         data = self.predictor.router_client.recv_multipart()
         obs = pickle.loads(data[-1])
         print("receive data:", obs)
@@ -36,7 +37,7 @@ class Predictor(object):
         print("send data:", send_data)
 
     def sub_model(self):
-        weights = self.predictor.sub_trainer.recv()
+        weights = self.predictor.sub_trainer.recv(self.predictor.noblock)
         weights = pickle.loads(weights)
         self.model.set_weights(weights)
 
@@ -45,9 +46,17 @@ class Predictor(object):
 
     def run(self):
         while True:
-            self.sub_model()
-            print("sub success")
+            try:
+                self.sub_model()
+                print("sub model success")
+            except:
+                pass
+
             self.predict()
+            print("predict success")
+
+
+
 
 
 

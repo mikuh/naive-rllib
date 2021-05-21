@@ -6,7 +6,7 @@ import gym
 from naive_rllib.utils import get_logger, package_path
 from naive_rllib.agents.ppo import Agent
 
-logger = get_logger(os.path.join(package_path, "logs/client.log"))
+logger = get_logger(os.path.join(package_path, "logs/client.log"), level="ERROR")
 
 
 class Instance(object):
@@ -71,9 +71,9 @@ class AtariClient(object):
         while True:
             while not self.instance.is_full():
                 self.env.render()
-                self.logger.debug("waitting get predictor's result")
+                # self.logger.debug("waitting get predictor's result")
                 action, policy, value = self.agent.get_action(obs)
-                self.logger.debug("get result from predictor success: {}, {}, {}", action, policy, value)
+                # self.logger.debug("get result from predictor success: {}, {}, {}", action, policy, value)
                 next_obs, reward, done, info = self.env.step(action)
                 score += reward
                 steps += 1
@@ -82,8 +82,8 @@ class AtariClient(object):
                 if done:
                     obs = self.env.reset()
                     episode += 1
-                    self.logger.info("Game start {} episode!".format(episode))
-                    self.logger.debug("score{},", score)
+                    # self.logger.info("Game start {} episode!".format(episode))
+                    # self.logger.debug("score{},", score)
                     # push steps, episode, win_num
                     self.agent.push_logger(
                         self.agent.moni.record(score=score, episode=episode, steps=steps).reset())
